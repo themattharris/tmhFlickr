@@ -1,0 +1,4 @@
+include DESCRIPTION.rst
+include src/exiv2wrapper.cpp
+include src/exiv2wrapper.hpp
+include src/exiv2wrapper_python.cpp

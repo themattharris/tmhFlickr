@@ -1,0 +1,14 @@
+brew install boost-python3 --build-from-source
+brew install gexiv2 pygobject pygobject3
+
+# this is all done inside the vendor copy of py3exiv2 in this repo - but this is what i did (incase you put boost elsewhere)
+pip3 download py3exiv2
+tar -xvf py3exiv2-0.4.0.tar.gz
+cd py3exiv2-0.4.0.tar.gz
+rm setup.py
+wget https://gist.githubusercontent.com/jpadhye/3a8301f85378b769e5956d7eeb963812/raw/8a205b411f27d7b001ef775a5e484dbb15bc1e26/setup.py
+# remove the [ in the file
+# update library_dirs=['/usr/local/Cellar/boost-python3/1.68.0/lib'],
+pip3 install .
+cd /usr/local/Cellar/boost-python3/1.68.0/lib
+sudo ln -s libboost_python37.dylib libboost_python3.dylib
