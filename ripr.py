@@ -3,8 +3,8 @@
 # TODO
 # add checks for errors- try catch
 # add data taken check - some of these are missing them
-# move title into description as well
-# add in a text search when getting photosOf (not just PhotosOf and tags)
+# (done) move title into description as well
+# (done) add in a text search when getting photosOf (not just PhotosOf and tags)
 # fix serialization bug. F object doesn't pickle properly
 # add "auth" flow helper
 
@@ -178,12 +178,8 @@ def process_photolist_for_real(photo_list, limit=None):
 
 def serialize_to_file(obj, save_path, filename):
 	print('saving meta to {}'.format(os.path.join(save_path, filename)))
-
 	# objects are a mess so dump to json
-	
-
-
-	pickle.dump(obj, open('{}.bin'.format(os.path.join(save_path, filename)), "wb" ))
+	# pickle.dump(obj, open('{}.bin'.format(os.path.join(save_path, filename)), "wb" ))
 
 
 def update_photometa(meta, save_path, filename):
@@ -204,8 +200,9 @@ def update_photometa(meta, save_path, filename):
 
 	metadata['Xmp.dc.title'] = meta['info']['title']
 	
-	metadata['Exif.Image.ImageDescription'] = meta['info']['description']
-	metadata['Xmp.dc.description'] = meta['info']['description']
+	description = "{}\n{}".format(meta['info']['title'], meta['info']['description'])
+	metadata['Exif.Image.ImageDescription'] = description
+	metadata['Xmp.dc.description'] = description
 	
 	metadata['Exif.Image.ImageID'] = meta['info']['urls']['url'][0]['text']
 	metadata['Xmp.dc.source'] = meta['info']['urls']['url'][0]['text']
