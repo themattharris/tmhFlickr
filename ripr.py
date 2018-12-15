@@ -31,6 +31,15 @@ def emit(obj):
 def emit_dict(obj):
 	pp(obj.__dict__)
 
+def uniq_photolist(photo_list):
+	seen = set()
+	uniq = []
+	for p in photo_list:
+		if p.id not in seen:
+			uniq.append(p)
+			seen.add(p.id)
+	return uniq
+
 def extract_filename(url):
 	return os.path.splitext(os.path.basename(url))[0]
 
@@ -107,14 +116,20 @@ def get_group_photos(group):
 
 # matt nsid: 20071329@N00
 # cindy nsid: 43082001@N00
-def get_photosof(user, tags=None):
+def get_photosof(user, tags=None, text=None):
 	print('Requesting photosOf {}'.format(user.username))
 	data = get_with_pagination(user.getPhotosOf, extras=EXTRAS)
 	if tags is not None:
 		print('Requesting photos with tags: {}'.format(tags))
-		# f.Photo.search(extras=EXTRAS, tags=user_tag, per_page=PER_PAGE)
 		data = data + get_with_pagination(f.Photo.search, extras=EXTRAS, tags=tags)
-	return data
+	if text is not None:
+		if not isinstance(text, list):
+			text = [text]
+		for t in text:
+			print('Requesting photos using text search of: {}'.format(t))
+			data = data + get_with_pagination(f.Photo.search, extras=EXTRAS, text=t)
+
+	return uniq_photolist(data)
 
 # iterate over the photos
 # download them, 
@@ -162,7 +177,12 @@ def process_photolist_for_real(photo_list, limit=None):
 		update_photometa(meta, save_path, filename)
 
 def serialize_to_file(obj, save_path, filename):
-	print('saving to {}'.format(os.path.join(save_path, filename)))
+	print('saving meta to {}'.format(os.path.join(save_path, filename)))
+
+	# objects are a mess so dump to json
+	
+
+
 	pickle.dump(obj, open('{}.bin'.format(os.path.join(save_path, filename)), "wb" ))
 
 
@@ -224,7 +244,7 @@ def inspect_meta(filename):
 
 if len(sys.argv) == 2 and sys.argv[1] == 'go':
 	cindy = get_user('cindyli')
-	photo_list = get_photosof(cindy, 'cindyli,"cindy li",cindylidesign')
+	photo_list = get_photosof(cindy, 'cindyli,"cindy li",cindylidesign', ['cindy li', 'cindyli'])
 	print('Got {} Photos'.format(len(photo_list)))
 	process_photolist(photo_list)
 
