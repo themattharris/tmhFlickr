@@ -6,9 +6,9 @@
 # (done) move title into description as well
 # (done) add in a text search when getting photosOf (not just PhotosOf and tags)
 # fix serialization bug. F object doesn't pickle properly
-# add "auth" flow helper
+# (done) add "auth" flow helper
 
-
+import flickr_keys
 import flickr_api as f
 import os
 import pickle
@@ -18,12 +18,26 @@ import threading
 from pprint import pprint as pp
 from math import ceil
 
-f.set_auth_handler("mharris_auth.txt")
-
 PER_PAGE=400
 EXTRAS=['description, license, date_upload, date_taken, owner_name, icon_server, original_format, '
 		'last_update, geo, tags, machine_tags, o_dims, media, path_alias, url_t, url_l, url_o']
 THREADS=8
+
+f.set_keys(api_key = flickr_keys.API_KEY, api_secret = flickr_keys.API_SECRET)
+
+def authorize():
+	a = f.auth.AuthHandler()
+	perms = "read"
+	url = a.get_authorization_url(perms)
+	print("Go here and then come back: {}".format(url))
+	verifier = input('Enter the oauth_verifier value from the webpage shown after you authorized access: ')
+	a.set_verifier(verifier)
+	f.set_auth_handler(a)
+	user = whoami()
+
+	creds_file = "{}_auth.txt".format(user.username)
+	a.save(creds_file)
+	print("Saved as {}".format(creds_file))
 
 def emit(obj):
 	pp(obj)
@@ -80,8 +94,9 @@ def get_user(username):
 	return user
 
 def get_photo_by_id(id):
-	p = f.Photo(id)
-	return p.getInfo()
+	p = f.Photo(id=id)
+	p.getInfo()
+	return p
 
 # Returns a list of groups to which you can add photos.
 def get_groups():
@@ -240,10 +255,14 @@ def inspect_meta(filename):
 		print('{}: {}'.format(key, metadata[key].raw_value))
 
 if len(sys.argv) == 2 and sys.argv[1] == 'go':
+	f.set_auth_handler("cindyli_auth.txt")
 	cindy = get_user('cindyli')
 	photo_list = get_photosof(cindy, 'cindyli,"cindy li",cindylidesign', ['cindy li', 'cindyli'])
 	print('Got {} Photos'.format(len(photo_list)))
 	process_photolist(photo_list)
+elif len(sys.argv) == 2 and sys.argv[1] == 'auth':
+	authorize()
+
 
 # pp(get_user_photos(cindy))
 # pp(get_groups())
