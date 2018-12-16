@@ -24,40 +24,7 @@ PER_PAGE=400
 EXTRAS=['description, license, date_upload, date_taken, owner_name, icon_server, original_format, '
         'last_update, geo, tags, machine_tags, o_dims, media, path_alias, url_t, url_l, url_o']
 THREADS=8
-
-FLICKR_TAG_MAPPINGS={
-  # 'JFIF.JFIFVersion': ''
-  # 'JFIF.ResolutionUnit': ''
-  'JFIF.XResolution': 'Exif.Image.XResolution',
-  'JFIF.YResolution': 'Exif.Image.YResolution',
-  'IFD0.Make': 'Exif.Image.Make',
-  'IFD0.Model': 'Exif.Image.Model',
-  'IFD0.Orientation': 'Exif.Image.Orientation',
-  'IFD0.ResolutionUnit': 'Exif.Image.ResolutionUnit',
-  'IFD0.ModifyDate': 'Exif.Image.DateTime',
-  'ExifIFD.ExposureTime': 'Exif.Photo.ExposureTime',
-  'ExifIFD.FNumber': 'Exif.Photo.FNumber',
-  'ExifIFD.ExifVersion': 'Exif.Photo.ExifVersion',
-  'ExifIFD.DateTimeOriginal': 'Exif.Photo.DateTimeOriginal',
-  'ExifIFD.CreateDate': 'Exif.Photo.DateTimeDigitized',
-  'ExifIFD.CompressedBitsPerPixel': 'Exif.Photo.CompressedBitsPerPixel',
-  'ExifIFD.ExposureCompensation': '',
-  'ExifIFD.MaxApertureValue': 'Exif.Photo.MaxApertureValue',
-  'ExifIFD.MeteringMode': 'Exif.Photo.MeteringMode',
-  'ExifIFD.Flash': 'Exif.Photo.Flash',
-  'ExifIFD.FocalLength': 'Exif.Photo.FocalLength',
-  'ExifIFD.FlashpixVersion': 'Exif.Photo.FlashpixVersion',
-  'ExifIFD.ColorSpace': 'Exif.Photo.ColorSpace',
-  'ExifIFD.FocalPlaneXResolution': 'Exif.Photo.FocalPlaneXResolution',
-  'ExifIFD.FocalPlaneYResolution': 'Exif.Photo.FocalPlaneYResolution',
-  'ExifIFD.FocalPlaneResolutionUnit': 'Exif.Photo.FocalPlaneResolutionUnit',
-  'ExifIFD.SensingMethod': 'Exif.Photo.SensingMethod',
-  'ExifIFD.CustomRendered': 'Exif.Photo.CustomRendered',
-  'ExifIFD.ExposureMode': 'Exif.Photo.ExposureMode',
-  'ExifIFD.WhiteBalance': 'Exif.Photo.WhiteBalance',
-  'ExifIFD.DigitalZoomRatio': 'Exif.Photo.DigitalZoomRatio',
-  'ExifIFD.SceneCaptureType': 'Exif.Photo.SceneCaptureType',
-}
+ALLOW_SKIPPING=False
 
 f.set_keys(api_key = flickr_keys.API_KEY, api_secret = flickr_keys.API_SECRET)
 
@@ -85,7 +52,7 @@ def say(message):
   print(message)
 
 def say_with_photo(photo, message):
-  say('{}: {}'.format(extract_filename(photo.url), message))
+  say('{}: {}'.format(extract_filename(photo.getPhotoFile()), message))
 
 def uniq_photolist(photo_list):
   seen = set()
@@ -97,7 +64,10 @@ def uniq_photolist(photo_list):
   return uniq
 
 def extract_filename(url):
-  return os.path.splitext(os.path.basename(url))[0]
+  return os.path.basename(url)
+
+def filename_no_ext(filename):
+  return os.path.splitext(filename)[0]
 
 def enable_cache(enable):
   if enable:
@@ -181,6 +151,12 @@ def get_photosof(user, tags=None, text=None):
 
   return uniq_photolist(data)
 
+def get_photofile(photo):
+  photofile = photo.getPhotoFile()
+  if "Original" in photo.sizes.keys():
+    photofile = photo.sizes['Original']['source']
+  return photofile
+
 # iterate over the photos
 # download them, 
 # store them in an output directory under the yyyy-mm-dd they were taken
@@ -204,27 +180,46 @@ def process_photolist_for_real(photo_list, limit=None):
       break
     processed += 1
 
-    filename = extract_filename(photo.getPhotoFile())
+    filename = extract_filename(get_photofile(photo))
     say('(T{}): Processing {} ({}/{})'.format(threading.get_ident(), filename, processed, len(photo_list)))
-    meta = get_photo_meta(photo)
+    process_photo(photo)
 
-    save_path = os.path.join('/Users', 'themattharris', 'Downloads', 'flickr', photo.taken.split()[0])
+def process_photo(photo):
+  filename = extract_filename(get_photofile(photo))
+  meta = get_photo_meta(photo)
 
-    if not os.path.exists(save_path):
-      os.makedirs(save_path)
+  save_path = os.path.join('/Users', 'themattharris', 'Downloads', 'flickr', photo.taken.split()[0])
 
-    # don't do anything if the file already exists
-    full_path = os.path.join(save_path, "{}.jpg".format(filename))
-    if os.path.isfile(full_path):
-      say_with_photo(photo, "already retrieved. skipping.")
-      continue
-    
-    # if no size_label is specified the largest available is retrieved
-    photo.save(os.path.join(save_path, filename))
-    # save the meta to json for future use
-    serialize_to_file(photo, meta, save_path, filename)
-    # update the image meta
+  if not os.path.exists(save_path):
+    os.makedirs(save_path)
+
+  # don't do anything if the file already exists
+  full_path = os.path.join(save_path, filename)
+  if os.path.isfile(full_path) and ALLOW_SKIPPING:
+    say_with_photo(photo, "already retrieved. skipping.")
+    return
+
+  # if no size_label is specified the largest available is retrieved
+  if "Original" in photo.sizes.keys():
+    photo.save(os.path.join(save_path, filename_no_ext(filename)), 'Original')
+  else:
+    size = photo._getLargestSizeLabel()
+    suffix = '?zz=1'
+    # this suffix gets put into the filename so remove it
+    if photo.sizes[size]['source'].endswith(suffix):
+      photo.sizes[size]['source'] = photo.sizes[size]['source'][:-(len(suffix))]
+    photo.save(os.path.join(save_path, filename_no_ext(filename)))
+
+  # save the meta to json for future use
+  serialize_to_file(photo, meta, save_path, filename_no_ext(filename))
+  # update the image meta
+
+  try:
     update_photometa(photo, meta, save_path, filename)
+  except Exception as e:
+    print('EXCEPTION: {} while processing {}. Deleting file.'.format(filename, e))
+    os.remove(full_path)
+    pass
 
 def serialize_to_file(photo, meta, save_path, filename):
   save_path = os.path.join(save_path, "{}.json".format(filename))
@@ -234,57 +229,78 @@ def serialize_to_file(photo, meta, save_path, filename):
 
 def update_photometa(photo, meta, save_path, filename):
   say_with_photo(photo, 'Updating meta')
-  jpgfilename = '{}.jpg'.format(os.path.join(save_path, filename))
   # from inspection - looks like tags are already in there, as is geo
   # need to set description and title though
-  metadata = pyexiv2.ImageMetadata(jpgfilename)
+  metadata = pyexiv2.ImageMetadata(os.path.join(save_path, filename))
   metadata.read()
 
-  if not 'Exif.Image.DateTime' in metadata.exif_keys and len(meta['exif'] > 0):
-    say_with_photo(photo, "No exif found trying to copy from flickr")
-    metadata = copy_meta_from_flickr(metadata, meta)
-  else:
-    say_with_photo(photo, "No exif found and none retrieved from flickr. setting datetaken from 'taken'")
-    # we have to have the created data so use flickrs datestamp for taken
+  if not 'Exif.Image.DateTime' in metadata.exif_keys:
+    # always set this if it wasn't found
     metadata['Exif.Image.DateTime'] = photo.taken
+
+  if len(meta['exif']) > 0:
+    say_with_photo(photo, "Coping exif from flickr")
+    metadata = copy_meta_from_flickr(photo, metadata, meta)
             
-  metadata['Xmp.dc.title'] = meta['info']['title']
+  metadata['Xmp.dc.title'] = meta['info']['photo']['title']['_content']
     
-  description = "{}\n{}".format(meta['info']['title'], meta['info']['description'])
+  description = "{}\n{}".format(meta['info']['photo']['title']['_content'], meta['info']['photo']['description']['_content']).strip()
   metadata['Exif.Image.ImageDescription'] = description
   metadata['Xmp.dc.description'] = description
   
-  metadata['Exif.Image.ImageID'] = meta['info']['urls']['url'][0]['text']
-  metadata['Xmp.dc.source'] = meta['info']['urls']['url'][0]['text']
+  metadata['Exif.Image.ImageID'] = meta['info']['photo']['urls']['url'][0]['_content']
+  metadata['Xmp.dc.source'] = meta['info']['photo']['urls']['url'][0]['_content']
   
-  metadata['Exif.Image.Artist'] = meta['info']['owner'].username
-  metadata['Xmp.dc.creator'] = [meta['info']['owner'].username]
+  metadata['Exif.Image.Artist'] = meta['info']['photo']['owner']['username']
+  metadata['Xmp.dc.creator'] = [meta['info']['photo']['owner']['username']]
 
   subjects = []
-  subjects.append("owner:{}".format(meta['info']['owner'].username))
+  subjects.append("owner:{}".format(meta['info']['photo']['owner']['username']))
   
   # if 'Iptc.Application2.Keywords' in metadata.iptc_keys:
   #   subjects = metadata['Iptc.Application2.Keywords'].value
-  for tag in meta['info']['tags']:
-    subjects.append(tag.text)
+  for tag in meta['info']['photo']['tags']['tag']:
+    subjects.append(tag['raw'])
 
-  for person in meta['people']:
-    subjects.append("person:{}".format(person.username))
+  for person in meta['people']['people']['person']:
+    subjects.append("person:{}".format(person['username']))
 
-  for contexts in meta['contexts']:
-    for context_subtype in contexts:
-      subjects.append("context:{}".format(context_subtype.title))
+  for context in meta['contexts']:
+    for c in meta['contexts'][context]:
+      if context == 'stat':
+        continue
+      subjects.append("{}:{}".format(context, c['title']))
 
   metadata['Xmp.dc.subject'] = subjects
   metadata['Iptc.Application2.Keywords'] = subjects
+  say_with_photo(photo, 'Saving meta')
   metadata.write()
 
 # sometimes we don't get the original image (permissions), but flickr still lets us see
 # the exif from the api. re-insert the exif into the image we got back.
-def copy_meta_from_flickr(metadata, meta):
-  for exif in meta['exif']:
-    key = "{}.{}".format(meta['exif']['tagspace'], meta['exif']['tag'])
-    metadata[FLICKR_TAG_MAPPINGS[key]] = exif.raw
+def copy_meta_from_flickr(photo, metadata, meta):
+  for exif in meta['exif']['photo']['exif']:
+    tagspace = ''
+    if exif['tagspace'] == 'ExifIFD':
+      tagspace = 'Exif.Photo'
+    elif exif['tagspace'] == 'IFD0':
+      tagspace = 'Exif.Image'
+    elif exif['tagspace'] == 'JFIF':
+      tagspace = 'Exif.Image'
+    elif exif['tagspace'] == 'GPS':
+      tagspace = 'Exif.GPSInfo'
+    else:
+      say_with_photo(photo, 'ERROR: Unknown tagspace: {}'.format(exif['tagspace']))
+
+    key = "{}.{}".format(tagspace, exif['tag'])
+    try:
+      if key in metadata.exif_keys:
+        continue
+
+      metadata[key] = exif['raw']['_content']
+      say_with_photo(photo, "Set {} to {}".format(key, exif['raw']['_content']))
+    except KeyError as e:
+      pass
   return metadata
 
 def inspect_meta(filename):
@@ -296,6 +312,7 @@ def inspect_meta(filename):
 
 if len(sys.argv) > 1 and sys.argv[1] == 'fetch':
   f.set_auth_handler(sys.argv[2])
+  print('Authenticated as {}'.format(whoami().username))
   cindy = get_user('cindyli')
   photo_list = get_photosof(cindy, 'cindyli,"cindy li",cindylidesign', ['cindy li', 'cindyli'])
   print('Got {} Photos'.format(len(photo_list)))
@@ -306,10 +323,12 @@ elif len(sys.argv) > 1 and sys.argv[1] == 'inspect':
   inspect_meta(sys.argv[2])
 
 # f.set_auth_handler("cindyli_auth.txt")
-# photo = get_photo_by_id(112121201)
+# photo = get_photo_by_id(8621468460)
+
+# www.flickr.com/photo.gne?id=2333079071
 
 # in python3 to use this file do
-# exec(open("ripr.py").read())
+# exec(open("tmhFlickr.py").read())
 
 # matt nsid: 20071329@N00
 # cindy nsid: 43082001@N00
