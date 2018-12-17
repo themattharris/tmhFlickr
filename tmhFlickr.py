@@ -23,8 +23,7 @@ from math import ceil
 PER_PAGE=400
 EXTRAS=['description, license, date_upload, date_taken, owner_name, icon_server, original_format, '
         'last_update, geo, tags, machine_tags, o_dims, media, path_alias, url_t, url_l, url_o']
-THREADS=8
-ALLOW_SKIPPING=False
+ALLOW_SKIPPING=True
 
 f.set_keys(api_key = flickr_keys.API_KEY, api_secret = flickr_keys.API_SECRET)
 
@@ -163,15 +162,20 @@ def get_photofile(photo):
 # set the meta from the meta
 # store the meta in a json blob with the same name
 def process_photolist(photo_list):
-  from threading import Thread
-  from itertools import zip_longest
+  # from threading import Thread
+  # from itertools import zip_longest
 
-  size = ceil(len(photo_list) / THREADS)
-  bags = zip(*(iter(photo_list),) * size)
-  say("Processing across {} threads with bag size {}".format(THREADS, size))
-  for bag in bags:
-    t = Thread(target=process_photolist_for_real, args=(bag,))
-    t.start()
+  # size = ceil(len(photo_list) / THREADS)
+  # bags = zip(*(iter(photo_list),) * size)
+  # say("Processing across {} threads with bag size {}".format(THREADS, size))
+  # for bag in bags:
+  #   t = Thread(target=process_photolist_for_real, args=(bag,))
+  #   try:
+  #     t.start()
+  #   except Exception as e:
+  #     print('Exception in thread: {}'.format(e))
+  #     pass
+  process_photolist_for_real(photo_list)
 
 def process_photolist_for_real(photo_list, limit=None):
   processed = 0
@@ -180,14 +184,12 @@ def process_photolist_for_real(photo_list, limit=None):
       break
     processed += 1
 
-    filename = extract_filename(get_photofile(photo))
-    say('(T{}): Processing {} ({}/{})'.format(threading.get_ident(), filename, processed, len(photo_list)))
-    process_photo(photo)
+    message = 'Processing ({}/{})'.format(processed, len(photo_list))
+    process_photo(photo, message)
+  say('(T{}): DONE {}/{}'.format(threading.get_ident(), processed, len(photo_list)))
 
-def process_photo(photo):
+def process_photo(photo, progress_message=None):
   filename = extract_filename(get_photofile(photo))
-  meta = get_photo_meta(photo)
-
   save_path = os.path.join('/Users', 'themattharris', 'Downloads', 'flickr', photo.taken.split()[0])
 
   if not os.path.exists(save_path):
@@ -196,8 +198,10 @@ def process_photo(photo):
   # don't do anything if the file already exists
   full_path = os.path.join(save_path, filename)
   if os.path.isfile(full_path) and ALLOW_SKIPPING:
-    say_with_photo(photo, "already retrieved. skipping.")
+    # say_with_photo(photo, "already retrieved. skipping.")
     return
+
+  say_with_photo(photo, progress_message)
 
   # if no size_label is specified the largest available is retrieved
   if "Original" in photo.sizes.keys():
@@ -211,14 +215,24 @@ def process_photo(photo):
     photo.save(os.path.join(save_path, filename_no_ext(filename)))
 
   # save the meta to json for future use
+  meta = get_photo_meta(photo)
   serialize_to_file(photo, meta, save_path, filename_no_ext(filename))
   # update the image meta
+
+  if filename.endswith('gif'):
+    # we can't save meta into a gif, so just check the files ctime is the taken time
+    return
 
   try:
     update_photometa(photo, meta, save_path, filename)
   except Exception as e:
-    print('EXCEPTION: {} while processing {}. Deleting file.'.format(filename, e))
-    os.remove(full_path)
+    print('EXCEPTION: {} while processing. {}. Deleting files.'.format(filename, str(e)))
+    if os.path.isfile(full_path):
+      os.remove(full_path)
+
+    meta_file = os.path.join(save_path, "{}.json".format(filename))
+    if os.path.isfile(meta_file):
+      os.remove(meta_file)
     pass
 
 def serialize_to_file(photo, meta, save_path, filename):
@@ -273,7 +287,7 @@ def update_photometa(photo, meta, save_path, filename):
 
   metadata['Xmp.dc.subject'] = subjects
   metadata['Iptc.Application2.Keywords'] = subjects
-  say_with_photo(photo, 'Saving meta')
+  say_with_photo(photo, 'Writing meta to photo')
   metadata.write()
 
 # sometimes we don't get the original image (permissions), but flickr still lets us see
@@ -289,17 +303,27 @@ def copy_meta_from_flickr(photo, metadata, meta):
       tagspace = 'Exif.Image'
     elif exif['tagspace'] == 'GPS':
       tagspace = 'Exif.GPSInfo'
-    else:
-      say_with_photo(photo, 'ERROR: Unknown tagspace: {}'.format(exif['tagspace']))
+    # else:
+    #   say_with_photo(photo, 'ERROR: Unknown tagspace: {}'.format(exif['tagspace']))
 
     key = "{}.{}".format(tagspace, exif['tag'])
     try:
       if key in metadata.exif_keys:
         continue
 
-      metadata[key] = exif['raw']['_content']
-      say_with_photo(photo, "Set {} to {}".format(key, exif['raw']['_content']))
+      value = exif['raw']['_content']
+      if key == 'Exif.GPSInfo.GPSAltitudeRef':
+        if value.startswith("Above"):
+          value = 0
+        else:
+          value = 1
+
+      metadata[key] = value
+      say_with_photo(photo, "Set {} to {}".format(key, value))
     except KeyError as e:
+      pass
+    except pyexiv2.exif.ExifValueError as e:
+      # say("Couldn't set value of {} to {}".format(key, exif['raw']['_content']))
       pass
   return metadata
 
@@ -308,27 +332,26 @@ def inspect_meta(filename):
   metadata.read()
   keys = metadata.xmp_keys + metadata.exif_keys + metadata.iptc_keys
   for key in keys:
-    print('{}: {}'.format(key, metadata[key].raw_value))
+    say('{}: {}'.format(key, metadata[key].raw_value))
 
 if len(sys.argv) > 1 and sys.argv[1] == 'fetch':
   f.set_auth_handler(sys.argv[2])
-  print('Authenticated as {}'.format(whoami().username))
+  say('Authenticated as {}'.format(whoami().username))
   cindy = get_user('cindyli')
   photo_list = get_photosof(cindy, 'cindyli,"cindy li",cindylidesign', ['cindy li', 'cindyli'])
-  print('Got {} Photos'.format(len(photo_list)))
+  say('Got {} Photos'.format(len(photo_list)))
   process_photolist(photo_list)
 elif len(sys.argv) > 1 and sys.argv[1] == 'auth':
   authorize()
 elif len(sys.argv) > 1 and sys.argv[1] == 'inspect':
   inspect_meta(sys.argv[2])
 
-# f.set_auth_handler("cindyli_auth.txt")
-# photo = get_photo_by_id(8621468460)
-
 # www.flickr.com/photo.gne?id=2333079071
 
 # in python3 to use this file do
 # exec(open("tmhFlickr.py").read())
+# f.set_auth_handler("cindyli_auth.txt")
+# photo = get_photo_by_id(8621468460)
 
 # matt nsid: 20071329@N00
 # cindy nsid: 43082001@N00
