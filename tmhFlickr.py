@@ -20,7 +20,7 @@ from math import ceil
 PER_PAGE=400
 EXTRAS=['description, license, date_upload, date_taken, owner_name, icon_server, original_format, '
         'last_update, geo, tags, machine_tags, o_dims, media, path_alias, url_t, url_l, url_o']
-ALLOW_SKIPPING=False
+ALLOW_SKIPPING=True
 THREADS=4
 
 f.set_keys(api_key = flickr_keys.API_KEY, api_secret = flickr_keys.API_SECRET)
@@ -196,6 +196,9 @@ def process_photo(photo, progress_message=None):
   filename = extract_filename(get_photofile(photo))
   save_path = os.path.join('/Users', 'themattharris', 'Downloads', 'flickr', 'cindyli', photo.taken.split()[0])
 
+  if "Site MP4" in photo.sizes.keys():
+    filename = "{}.mp4".format(photo.id)
+
   if not os.path.exists(save_path):
     os.makedirs(save_path)
 
@@ -210,7 +213,6 @@ def process_photo(photo, progress_message=None):
   if "Site MP4" in photo.sizes.keys():
     # we have video so we need to do some direct fetching
     url = photo.sizes['Site MP4']['source']
-    filename = "{}.mp4".format(photo.id)
     urllib.request.urlretrieve(url, os.path.join(save_path, filename))
   elif "Original" in photo.sizes.keys():
     photo.save(os.path.join(save_path, filename_no_ext(filename)), 'Original')
