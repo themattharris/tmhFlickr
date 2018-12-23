@@ -1,13 +1,9 @@
 # https://python3-exiv2.readthedocs.io/en/latest/tutorial.html#reading-and-writing-xmp-tags
 
 # TODO
-# add checks for errors- try catch
-# (done) add data taken check - some of these are missing them
-# (done) move title into description as well
-# (done) add in a txt search when getting photosOf (not just PhotosOf and tags)
-# (done) fix serialization bug. F object doesn't pickle properly
-# (done) save meta to disc
-# (done) add "auth" flow helper
+# add group fetching
+# move save path to a project location e.g. /Download/flickr/<searchterm>
+# add a meta reprocessor function (uses the saves json)
 
 import flickr_keys
 import json
@@ -16,6 +12,7 @@ import os
 import pyexiv2
 import sys
 import threading
+import urllib.request
 from flickr_api.api import flickr
 from pprint import pprint as pp
 from math import ceil
@@ -23,7 +20,8 @@ from math import ceil
 PER_PAGE=400
 EXTRAS=['description, license, date_upload, date_taken, owner_name, icon_server, original_format, '
         'last_update, geo, tags, machine_tags, o_dims, media, path_alias, url_t, url_l, url_o']
-ALLOW_SKIPPING=True
+ALLOW_SKIPPING=False
+THREADS=4
 
 f.set_keys(api_key = flickr_keys.API_KEY, api_secret = flickr_keys.API_SECRET)
 
@@ -63,7 +61,14 @@ def uniq_photolist(photo_list):
   return uniq
 
 def extract_filename(url):
-  return os.path.basename(url)
+  return remove_zzs(os.path.basename(url))
+
+def remove_zzs(str):
+  suffix = '?zz=1'
+  # this suffix gets put into the filename so remove it
+  if str.endswith(suffix):
+    str = str[:-(len(suffix))]
+  return str
 
 def filename_no_ext(filename):
   return os.path.splitext(filename)[0]
@@ -162,20 +167,19 @@ def get_photofile(photo):
 # set the meta from the meta
 # store the meta in a json blob with the same name
 def process_photolist(photo_list):
-  # from threading import Thread
-  # from itertools import zip_longest
+  from threading import Thread
+  from itertools import zip_longest
 
-  # size = ceil(len(photo_list) / THREADS)
-  # bags = zip(*(iter(photo_list),) * size)
-  # say("Processing across {} threads with bag size {}".format(THREADS, size))
-  # for bag in bags:
-  #   t = Thread(target=process_photolist_for_real, args=(bag,))
-  #   try:
-  #     t.start()
-  #   except Exception as e:
-  #     print('Exception in thread: {}'.format(e))
-  #     pass
-  process_photolist_for_real(photo_list)
+  size = ceil(len(photo_list) / THREADS)
+  bags = zip(*(iter(photo_list),) * size)
+  say("Processing across {} threads with bag size {}".format(THREADS, size))
+  for bag in bags:
+    t = Thread(target=process_photolist_for_real, args=(bag,))
+    try:
+      t.start()
+    except Exception as e:
+      print('Exception in thread: {}'.format(e))
+      pass
 
 def process_photolist_for_real(photo_list, limit=None):
   processed = 0
@@ -190,7 +194,7 @@ def process_photolist_for_real(photo_list, limit=None):
 
 def process_photo(photo, progress_message=None):
   filename = extract_filename(get_photofile(photo))
-  save_path = os.path.join('/Users', 'themattharris', 'Downloads', 'flickr', photo.taken.split()[0])
+  save_path = os.path.join('/Users', 'themattharris', 'Downloads', 'flickr', 'cindyli', photo.taken.split()[0])
 
   if not os.path.exists(save_path):
     os.makedirs(save_path)
@@ -203,15 +207,16 @@ def process_photo(photo, progress_message=None):
 
   say_with_photo(photo, progress_message)
 
-  # if no size_label is specified the largest available is retrieved
-  if "Original" in photo.sizes.keys():
+  if "Site MP4" in photo.sizes.keys():
+    # we have video so we need to do some direct fetching
+    url = photo.sizes['Site MP4']['source']
+    filename = "{}.mp4".format(photo.id)
+    urllib.request.urlretrieve(url, os.path.join(save_path, filename))
+  elif "Original" in photo.sizes.keys():
     photo.save(os.path.join(save_path, filename_no_ext(filename)), 'Original')
   else:
     size = photo._getLargestSizeLabel()
-    suffix = '?zz=1'
-    # this suffix gets put into the filename so remove it
-    if photo.sizes[size]['source'].endswith(suffix):
-      photo.sizes[size]['source'] = photo.sizes[size]['source'][:-(len(suffix))]
+    photo.sizes[size]['source'] = remove_zzs(photo.sizes[size]['source'])
     photo.save(os.path.join(save_path, filename_no_ext(filename)))
 
   # save the meta to json for future use
@@ -219,8 +224,8 @@ def process_photo(photo, progress_message=None):
   serialize_to_file(photo, meta, save_path, filename_no_ext(filename))
   # update the image meta
 
-  if filename.endswith('gif'):
-    # we can't save meta into a gif, so just check the files ctime is the taken time
+  if filename.endswith('gif') or filename.endswith('mp4'):
+    # TODO: we can't save meta into these filetypes
     return
 
   try:
@@ -271,8 +276,6 @@ def update_photometa(photo, meta, save_path, filename):
   subjects = []
   subjects.append("owner:{}".format(meta['info']['photo']['owner']['username']))
   
-  # if 'Iptc.Application2.Keywords' in metadata.iptc_keys:
-  #   subjects = metadata['Iptc.Application2.Keywords'].value
   for tag in meta['info']['photo']['tags']['tag']:
     subjects.append(tag['raw'])
 
@@ -346,12 +349,15 @@ elif len(sys.argv) > 1 and sys.argv[1] == 'auth':
 elif len(sys.argv) > 1 and sys.argv[1] == 'inspect':
   inspect_meta(sys.argv[2])
 
+
 # www.flickr.com/photo.gne?id=2333079071
 
 # in python3 to use this file do
 # exec(open("tmhFlickr.py").read())
 # f.set_auth_handler("cindyli_auth.txt")
-# photo = get_photo_by_id(8621468460)
+# video: 8933537698
+# pic: 8621468460
+# photo = get_photo_by_id(id)
 
 # matt nsid: 20071329@N00
 # cindy nsid: 43082001@N00
