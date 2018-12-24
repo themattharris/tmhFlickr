@@ -4,6 +4,7 @@
 # add group fetching
 # move save path to a project location e.g. /Download/flickr/<searchterm>
 # add a meta reprocessor function (uses the saves json)
+# why is 2008-04-12/2409154758 video not working
 
 import flickr_keys
 import json
@@ -192,19 +193,16 @@ def process_photolist_for_real(photo_list, limit=None):
     process_photo(photo, message)
   say('(T{}): DONE {}/{}'.format(threading.get_ident(), processed, len(photo_list)))
 
-def process_photo(photo, progress_message=None):
+def process_photo(photo, progress_message=None, skip_if_exists=ALLOW_SKIPPING):
   filename = extract_filename(get_photofile(photo))
   save_path = os.path.join('/Users', 'themattharris', 'Downloads', 'flickr', 'cindyli', photo.taken.split()[0])
-
-  if "Site MP4" in photo.sizes.keys():
-    filename = "{}.mp4".format(photo.id)
 
   if not os.path.exists(save_path):
     os.makedirs(save_path)
 
   # don't do anything if the file already exists
   full_path = os.path.join(save_path, filename)
-  if os.path.isfile(full_path) and ALLOW_SKIPPING:
+  if os.path.isfile(full_path) and skip_if_exists:
     # say_with_photo(photo, "already retrieved. skipping.")
     return
 
@@ -213,7 +211,9 @@ def process_photo(photo, progress_message=None):
   if "Site MP4" in photo.sizes.keys():
     # we have video so we need to do some direct fetching
     url = photo.sizes['Site MP4']['source']
-    urllib.request.urlretrieve(url, os.path.join(save_path, filename))
+    temp_filename, headers = urllib.request.urlretrieve(url)
+    filename = os.path.join(save_path, headers.get_filename())
+    os.rename(temp_filename, filename)
   elif "Original" in photo.sizes.keys():
     photo.save(os.path.join(save_path, filename_no_ext(filename)), 'Original')
   else:
@@ -222,7 +222,13 @@ def process_photo(photo, progress_message=None):
     photo.save(os.path.join(save_path, filename_no_ext(filename)))
 
   # save the meta to json for future use
-  meta = get_photo_meta(photo)
+  # TODO: change this to @retry decorator
+  for i in range(10):
+    try:
+      meta = get_photo_meta(photo)
+    except JSONDecodeError as e:
+      say_with_photo('JSON decode error. Likely a 502. retrying')
+
   serialize_to_file(photo, meta, save_path, filename_no_ext(filename))
   # update the image meta
 
