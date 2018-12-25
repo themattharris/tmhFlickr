@@ -5,6 +5,7 @@
 # move save path to a project location e.g. /Download/flickr/<searchterm>
 # add a meta reprocessor function (uses the saves json)
 # why is 2008-04-12/2409154758 video not working
+# add geo to content - if it's not in exif add it
 
 import flickr_keys
 import json
