@@ -99,11 +99,11 @@ class Flickr:
       )
       current_page += 1
       total_pages = res.info.pages
-      data = data + res.data      
+      data = data + res.data
 
       if limit is not None and current_page >= limit:
         break
-    return data 
+    return data
 
   def whoami():
     f.set_keys(api_key = flickr_keys.API_KEY, api_secret = flickr_keys.API_SECRET)
@@ -177,7 +177,7 @@ class Fetch:
     return photofile
 
   # iterate over the photos
-  # download them, 
+  # download them,
   # store them in an output directory under the yyyy-mm-dd they were taken
   # set the meta from the meta
   # store the meta in a json blob with the same name
@@ -276,22 +276,22 @@ class Fetch:
     if len(meta['exif']) > 0:
       say_with_photo(photo, "Coping exif from flickr")
       metadata = copy_meta_from_flickr(photo, metadata, meta)
-              
+
     metadata['Xmp.dc.title'] = meta['info']['photo']['title']['_content']
-      
+
     description = "{}\n{}".format(meta['info']['photo']['title']['_content'], meta['info']['photo']['description']['_content']).strip()
     metadata['Exif.Image.ImageDescription'] = description
     metadata['Xmp.dc.description'] = description
-    
+
     metadata['Exif.Image.ImageID'] = meta['info']['photo']['urls']['url'][0]['_content']
     metadata['Xmp.dc.source'] = meta['info']['photo']['urls']['url'][0]['_content']
-    
+
     metadata['Exif.Image.Artist'] = meta['info']['photo']['owner']['username']
     metadata['Xmp.dc.creator'] = [meta['info']['photo']['owner']['username']]
 
     subjects = []
     subjects.append("owner:{}".format(meta['info']['photo']['owner']['username']))
-    
+
     for tag in meta['info']['photo']['tags']['tag']:
       subjects.append(tag['raw'])
 
