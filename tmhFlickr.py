@@ -7,6 +7,7 @@
 # why is 2008-04-12/2409154758 video not working
 # add geo to content - if it's not in exif add it
 
+import datetime
 import flickr_keys
 import json
 import flickr_api as f
@@ -59,6 +60,9 @@ class Util:
     if str.endswith(suffix):
       str = str[:-(len(suffix))]
     return str
+
+  def epoch_to_date_str(timestamp):
+    return str(datetime.datetime.fromtimestamp(int(timestamp)))
 
   def filename_no_ext(filename):
     return os.path.splitext(filename)[0]
@@ -346,13 +350,94 @@ class Fetch:
         pass
     return metadata
 
-class Inspect:
-  def display_meta(filename):
+class Meta:
+  def inspect_embedded(filename):
     metadata = pyexiv2.ImageMetadata(filename)
     metadata.read()
     keys = metadata.xmp_keys + metadata.exif_keys + metadata.iptc_keys
     for key in keys:
       Util.say('{}: {}'.format(key, metadata[key].raw_value))
+
+  def inspect_cached(filename):
+    meta_json = Util.filename_no_ext(filename) + ".json"
+    meta = Meta.read_cached(meta_json)
+    if meta == False:
+      Util.say("{} not found.".format(meta_json))
+    else:
+      Util.emit(meta)
+
+  def read_cached(filename):
+    if not os.path.exists(filename):
+      return False
+
+    with open(filename, 'r') as f:
+      meta = json.load(f)
+
+    return meta
+
+  def process_cached(meta):
+    say('processing meta')
+
+  def title_from_cached(meta):
+    return meta['info']['photo']['title']['_content'].strip()
+
+  def description_from_cached(meta):
+    return meta['info']['photo']['description']['_content'].strip()
+
+  def notes_from_cached(meta):
+    notes = []
+    for note in meta['info']['photo']['notes']['note']:
+      notes.append(note)
+    return notes
+
+  def geo_from_cached(meta):
+    location = meta['info']['photo']['location']
+    return location
+
+  def woeid_from_cached(meta):
+    loc = Meta.geo_from_cached(meta)
+    return loc['woeid']
+
+  def latlng_from_cached(meta):
+    loc = Meta.geo_from_cached(meta)
+    return loc['latitude'], loc['longitude']
+
+  def flickr_perms_from_cached(meta):
+    key = meta['info']['photo']['visibility']
+    perms = []
+    if key['isfriend'] == 1:
+      perms.append('friends')
+    if key['isfamily'] == 1:
+      perms.append('family')
+    if key['ispublic'] == 1:
+      perms.append('public')
+
+    return '& '.join(perms)
+
+  def tags_from_cached(meta):
+    tags = []
+
+    # make things a little easier
+    info = meta['info']['photo']
+    exif = meta['exif']['photo']['exif']
+    people = meta['people']['people']['person']
+    contexts = meta['contexts']
+
+    for tag in info['tags']['tag']:
+      tags.append(tag['_content'])
+
+    for person in people:
+      tags.append('person:{}'.format(person['realname']))
+      tags.append('person_screenname:{}'.format(person['username']))
+
+    # this is fairly verbose given the extraction needed
+    tags.append('uploaded:{}'.format(Util.epoch_to_date_str(info['dateuploaded'])))
+    tags.append('owner_handle:{}'.format(info['owner']['username']))
+    tags.append('owner_nsid:{}'.format(info['owner']['nsid']))
+    tags.append('owner:{}'.format(info['owner']['realname']))
+    tags.append('woeid:{}'.format(Meta.woeid_from_cached(meta)))
+
+    return tags
 
 
 def help():
@@ -373,19 +458,21 @@ if len(sys.argv) > 1:
     Fetch.process_photolist(photo_list)
   elif sys.argv[1] == 'auth':
     authorize()
-  elif sys.argv[1] == 'inspect':
-    Inspect.display_meta(sys.argv[2])
+  elif sys.argv[1] == 'inspect_embedded':
+    Meta.inspect_embedded(sys.argv[2])
+  elif sys.argv[1] == 'inspect_cached':
+    Meta.inspect_cached(sys.argv[2])
   elif sys.argv[1] == 'whoami':
     f.set_auth_handler(sys.argv[2])
     Util.say('Authenticated as {}'.format(Flickr.whoami().username))
   else:
     help()
-else:
-  help()
+# else:
+  # help()
 
 
 # www.flickr.com/photo.gne?id=2333079071
-
+# path = "/users/themattharris/Downloads/flickr/cindyli/2013-06-02/8933537698.mp4"
 # in python3 to use this file do
 # exec(open("tmhFlickr.py").read())
 # f.set_auth_handler("cindyli_auth.txt")
