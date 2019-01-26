@@ -3,9 +3,9 @@
 # TODO
 # add group fetching
 # move save path to a project location e.g. /Download/flickr/<searchterm>
-# add a meta reprocessor function (uses the saves json)
-# why is 2008-04-12/2409154758 video not working
-# add geo to content - if it's not in exif add it
+# IN PROGRESS add a meta reprocessor function (uses the saves json)
+# IN PROGRESS add geo to content - if it's not in exif add it -- extracted, now need to use it
+# IN PROGRESS for the meta extractors, check for key else return false
 
 import datetime
 import flickr_keys
@@ -21,7 +21,6 @@ from pprint import pprint as pp
 from math import ceil
 
 f.set_keys(api_key = flickr_keys.API_KEY, api_secret = flickr_keys.API_SECRET)
-
 
 class Provision:
   def authorize():
@@ -167,6 +166,7 @@ class Flickr:
 class Fetch:
   ALLOW_SKIPPING=True
   THREADS=4
+  NSID_BLACKLIST=['11537427@N04', '9508724@N04'] # list of NSIDs found to match search but not be of cindy. GENERALISE THIS
 
   def enable_cache(enable):
     if enable:
@@ -478,7 +478,7 @@ if len(sys.argv) > 1:
 # f.set_auth_handler("cindyli_auth.txt")
 # video: 8933537698
 # pic: 8621468460
-# photo = get_photo_by_id(id)
+# photo = Flickr.get_photo_by_id(id)
 
 # matt nsid: 20071329@N00
 # cindy nsid: 43082001@N00
