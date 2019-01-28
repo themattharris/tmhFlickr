@@ -1,23 +1,9 @@
 # https://python3-exiv2.readthedocs.io/en/latest/tutorial.html#reading-and-writing-xmp-tags
 
 # TODO
-# add group fetching
-# move save path to a project location e.g. /Download/flickr/<searchterm>
 # IN PROGRESS add a meta reprocessor function (uses the saves json)
 # IN PROGRESS add geo to content - if it's not in exif add it -- extracted, now need to use it
 # IN PROGRESS for the meta extractors, check for key else return false
-
-# import datetime
-# import flickr_keys
-# import json
-# import flickr_api as f
-# import os
-# import pyexiv2
-# import sys
-# import threading
-#
-# from flickr_api.api import flickr
-# from math import ceil
 
 from tmhFlickr import fetch, meta, utils
 import flickr_keys
