@@ -23,7 +23,14 @@ def enable_cache(enable):
     f.disable_cache()
 
 def get_photofile(photo):
-  photofile = photo.getPhotoFile()
+  for i in range(RETRIES):
+    try:
+      photofile = photo.getPhotoFile()
+    except Exception as e:
+      log('{}: Exception {} retrying'.format(extract_filename(meta_file), e))
+      continue
+    else:
+      break
 
   if "Site MP4" in photo.sizes.keys():
     url = photo.sizes['Site MP4']['source']
@@ -98,7 +105,7 @@ def fetch_photolist(photolist, save_path, limit=None):
         print('{}/{}: {}'.format(processed, len(photolist), filename(photo)))
         fetch(photo, save_path, 1)
       except Exception as e:
-        log('{}: Exception {} retrying'.format(extract_filename(meta_file), e))
+        log('Exception {} retrying'.format(e))
         continue
       else:
         break
@@ -121,7 +128,7 @@ def fetch(photo, save_path, retries=RETRIES):
         log('{}: fetching meta'.format(extract_filename(meta_file)))
         fetch_meta(photo, meta_file)
     except Exception as e:
-      log('{}: Exception {} retrying'.format(extract_filename(meta_file), e))
+      log('Exception {} retrying'.format(e))
       continue
     else:
       break

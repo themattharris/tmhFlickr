@@ -74,7 +74,6 @@ def get_photosof(save_root):
     text=['cindy li', 'cindyli'])
   cindy_list = photos_of + tagged + searched
 
-
   photos_of = fetch.get_with_pagination(matt.getPhotosOf,
     extras=fetch.EXTRAS)
   tagged = fetch.get_with_pagination(fetch.f.Photo.search,
@@ -94,7 +93,7 @@ def get_photosby(save_root, username):
   save_path = os.path.join(save_root, username)
   fetch.fetch_photolist(photolist, save_path)
 
-save_root = os.path.join('/Users', 'themattharris', 'Downloads', 'flickr')
+save_root = os.path.join('/Volumes', 'home', 'Flickr')
 fetch.set_auth(flickr_keys.API_KEY, flickr_keys.API_SECRET, os.path.join(os.getcwd(), 'cindyli_auth.txt'))
 
 # examples
@@ -111,10 +110,13 @@ fetch.set_auth(flickr_keys.API_KEY, flickr_keys.API_SECRET, os.path.join(os.getc
 ####
 # fetch.fetch_by_id(8933537698, save_root)
 
-####
-media_path = os.path.join('/Users', 'themattharris', 'Downloads', 'flickr', 'ginader', '2010-11-07','5170158196_db1dfc35fa_o.json')
+####420421477
+# media_path = os.path.join('/Users', 'themattharris', 'Downloads', 'flickr', 'ginader', '2010-11-07','5170158196_db1dfc35fa_o.json')
+# media_path = '/Volumes/home/Flickr/photos_of/2014-04-30/14076080034_e130ee87e6_o.jpg'
 # meta.inspect_cached(media_path)
-utils.emit(meta.tags_from_cached(meta.read_cached(media_path)))
+# meta.inspect_embedded(media_path)
+# new_meta = meta.new_metadata(meta.read_cached(media_path))
+# meta.save_meta(media_path, new_meta)
 
 # www.flickr.com/photo.gne?id=2333079071
 # matt nsid: 20071329@N00
