@@ -1,6 +1,7 @@
 import json
 import os
 import pyexiv2
+from shutil import copyfile
 from .utils import say, strip_extension, emit, epoch_to_date_str, decimal_to_dms_fractions
 
 LICENSES = {
@@ -17,6 +18,9 @@ LICENSES = {
   10: "Public Domain Mark"
 }
 
+# namespace needs to be registered to ensure we can parse the embedded tags
+pyexiv2.xmp.register_namespace('http://www.apple.com/apple-fi/', 'apple-fi')
+
 def inspect_embedded(filename):
   metadata = pyexiv2.ImageMetadata(filename)
   metadata.read()
@@ -25,7 +29,10 @@ def inspect_embedded(filename):
 def print_embedded(metadata):
   keys = metadata.xmp_keys + metadata.exif_keys + metadata.iptc_keys
   for key in keys:
-    say('{}: {}'.format(key, metadata[key].raw_value))
+    try:
+      say('{}: {}'.format(key, metadata[key].raw_value))
+    except UnicodeDecodeError as e:
+      print('{}: {}'.format(key, 'UnicodeDecodeError'))
 
 def inspect_cached(filename):
   meta_json = strip_extension(filename) + ".json"
@@ -72,15 +79,17 @@ def new_metadata(meta_cached):
 
   return new_metadata
 
-def save_meta(media_path, new_metadata):
+def save_meta(media_path, new_metadata, liverun=False):
   metadata = pyexiv2.ImageMetadata(media_path)
   metadata.read()
-  print_embedded(metadata)
-  print('------------------------')
   for field in new_metadata:
     metadata[field] = new_metadata[field]
-  print_embedded(metadata)
-  # metadata.write()
+
+  if not liverun:
+    print('would write metadata:')
+    print_embedded(metadata)
+  else:
+    metadata.write()
 
 #####
 #
@@ -113,7 +122,13 @@ def woeid_from_cached(meta):
 
 def latlng_from_cached(meta):
   loc = geo_from_cached(meta)
-  return float(loc.get('latitude', None)), float(loc.get('longitude', None))
+  lat = loc.get('latitude', None)
+  lng = loc.get('longitude', None)
+  if lat is not None:
+    lat = float(lat)
+  if lng is not None:
+    lng = float(lng)
+  return lat, lng
 
 def geo_block_from_cached(meta, key):
   loc = geo_from_cached(meta)

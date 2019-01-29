@@ -33,6 +33,9 @@ def epoch_to_date_str(timestamp):
 def strip_extension(filename):
   return os.path.splitext(filename)[0]
 
+def get_extension(filename):
+  return os.path.splitext(filename)[1]
+
 def uniq_by_id(photo_list):
   seen = set()
   uniq = []
