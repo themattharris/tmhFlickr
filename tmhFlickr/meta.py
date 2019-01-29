@@ -3,6 +3,20 @@ import os
 import pyexiv2
 from .utils import say, strip_extension, emit, epoch_to_date_str, decimal_to_dms_fractions
 
+LICENSES = {
+  0: "All Rights Reserved",
+  1: "Attribution-NonCommercial-ShareAlike License",
+  2: "Attribution-NonCommercial License",
+  3: "Attribution-NonCommercial-NoDerivs License",
+  4: "Attribution License",
+  5: "Attribution-ShareAlike License",
+  6: "Attribution-NoDerivs License",
+  7: "No known copyright restrictions",
+  8: "United States Government Work",
+  9: "Public Domain Dedication (CC0)",
+  10: "Public Domain Mark"
+}
+
 def inspect_embedded(filename):
   metadata = pyexiv2.ImageMetadata(filename)
   metadata.read()
@@ -56,8 +70,6 @@ def new_metadata(meta_cached):
     new_metadata['Exif.GPSInfo.GPSLongitude'] = decimal_to_dms_fractions(lng)
     new_metadata['Exif.GPSInfo.GPSLongitudeRef'] = 'E' if lng >= 0 else 'W'
 
-  # add flickr perm
-  # add license
   return new_metadata
 
 def save_meta(media_path, new_metadata):
@@ -72,6 +84,9 @@ def save_meta(media_path, new_metadata):
 
 #####
 #
+
+def license_from_cached(meta):
+  return LICENSES[int(meta['info']['photo']['license'])]
 
 def date_taken_from_cached(meta):
   return meta['info']['photo']['dates']['taken'].strip()
@@ -123,23 +138,13 @@ def photopage_from_cached(meta):
 def owner_from_cached(meta):
   return meta['info']['photo']['owner']
 
-def flickr_perms_from_cached(meta):
-  key = meta['info']['photo']['visibility']
-  perms = []
-  if key['isfriend'] == 1:
-    perms.append('friends')
-  if key['isfamily'] == 1:
-    perms.append('family')
-  if key['ispublic'] == 1:
-    perms.append('public')
-
-  return '& '.join(perms)
-
 def tags_from_cached(meta):
-  tags = info = exif = people = []
+  tags = info = exif = people = contexts = []
 
   # make things a little easier
   info = meta['info']['photo']
+  visibility = meta['info']['photo']['visibility']
+
   if any(meta['exif']):
     exif = meta['exif']['photo']['exif']
   if any(meta['people']):
@@ -174,5 +179,12 @@ def tags_from_cached(meta):
     val = geo(meta)
     if val is not None:
       tags.append('{}:{}'.format(geo.__name__.split('_')[0], val))
+
+  # permission tags
+  for vis in ['isfriend', 'isfamily', 'ispublic']:
+    if visibility[vis] == 1:
+      tags.append('visibility:{}'.format(vis[2:]))
+
+  tags.append('license:{}'.format(license_from_cached(meta)))
 
   return tags
