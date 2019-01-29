@@ -108,11 +108,12 @@ fetch.set_auth(flickr_keys.API_KEY, flickr_keys.API_SECRET, os.path.join(os.getc
 # get_photosof(save_root)
 
 ####
-# fetch.fetch_by_id(8933537698, save_root)
+# id = 8933537698
+# fetch.fetch_by_id(id, save_root)
 
 ####420421477
 # media_path = os.path.join('/Users', 'themattharris', 'Downloads', 'flickr', 'ginader', '2010-11-07','5170158196_db1dfc35fa_o.json')
-# media_path = '/Volumes/home/Flickr/photos_of/2014-04-30/14076080034_e130ee87e6_o.jpg'
+# media_path = '/Users/themattharris/Dropbox/Matt/codespace/tmhFlickr/13965807623_dccbd87cdc_o.jpg'
 # meta.inspect_cached(media_path)
 # meta.inspect_embedded(media_path)
 # new_meta = meta.new_metadata(meta.read_cached(media_path))

@@ -1,7 +1,6 @@
 import json
 import os
 import pyexiv2
-from shutil import copyfile
 from .utils import say, strip_extension, emit, epoch_to_date_str, decimal_to_dms_fractions
 
 LICENSES = {
