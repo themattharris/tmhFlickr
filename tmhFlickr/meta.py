@@ -1,7 +1,7 @@
 import json
 import os
 import pyexiv2
-from .utils import say, strip_extension, emit, epoch_to_date_str
+from .utils import say, strip_extension, emit, epoch_to_date_str, decimal_to_fraction
 
 def inspect_embedded(filename):
   metadata = pyexiv2.ImageMetadata(filename)
@@ -39,16 +39,23 @@ def new_metadata(meta_cached):
   new_metadata['Xmp.dc.title'] = title_from_cached(meta_cached)
   new_metadata['Xmp.dc.subject'] = tags_from_cached(meta_cached)
   new_metadata['Iptc.Application2.Keywords'] = tags_from_cached(meta_cached)
-  if len(description_from_cached(meta_cached)) > 0:
-    new_metadata['Exif.Image.ImageDescription'] = description_from_cached(meta_cached)
-    new_metadata['Xmp.dc.description'] = description_from_cached(meta_cached)
   new_metadata['Exif.Image.ImageID'] = photopage_from_cached(meta_cached)
   new_metadata['Xmp.dc.source'] = photopage_from_cached(meta_cached)
   new_metadata['Exif.Image.Artist'] = owner_from_cached(meta_cached)['realname']
   new_metadata['Xmp.dc.creator'] = [owner_from_cached(meta_cached)['realname']]
 
-  # TODO
-  # add geo if we have it
+  if len(description_from_cached(meta_cached)) > 0:
+    new_metadata['Exif.Image.ImageDescription'] = description_from_cached(meta_cached)
+    new_metadata['Xmp.dc.description'] = description_from_cached(meta_cached)
+
+  # geo exif
+  lat, lng = latlng_from_cached(meta_cached)
+  if lat is not None and lng is not None:
+    new_metadata['Exif.GPSInfo.GPSLatitude'] = decimal_to_fraction(lat)
+    new_metadata['Exif.GPSInfo.GPSLatitudeRef'] = 'N' if lat >= 0 else 'S'
+    new_metadata['Exif.GPSInfo.GPSLongitude'] = decimal_to_fraction(lng)
+    new_metadata['Exif.GPSInfo.GPSLongitudeRef'] = 'E' if lng >= 0 else 'W'
+
   # add flickr perm
   # add license
   return new_metadata
@@ -56,12 +63,12 @@ def new_metadata(meta_cached):
 def save_meta(media_path, new_metadata):
   metadata = pyexiv2.ImageMetadata(media_path)
   metadata.read()
-  # print_embedded(metadata)
-  # print('------------------------')
+  print_embedded(metadata)
+  print('------------------------')
   for field in new_metadata:
     metadata[field] = new_metadata[field]
-  # print_embedded(metadata)
-  metadata.write()
+  print_embedded(metadata)
+  # metadata.write()
 
 #####
 #
@@ -91,7 +98,22 @@ def woeid_from_cached(meta):
 
 def latlng_from_cached(meta):
   loc = geo_from_cached(meta)
-  return loc.get('latitude', None), loc.get('longitude', None)
+  return float(loc.get('latitude', None)), float(loc.get('longitude', None))
+
+def geo_block_from_cached(meta, key):
+  loc = geo_from_cached(meta)
+  block = loc.get(key, None)
+  if block:
+    return block.get('_content', None)
+
+def region_from_cached(meta):
+  return geo_block_from_cached(meta, 'region')
+
+def county_from_cached(meta):
+  return geo_block_from_cached(meta, 'county')
+
+def country_from_cached(meta):
+  return geo_block_from_cached(meta, 'country')
 
 def photopage_from_cached(meta):
   for url in meta['info']['photo']['urls']['url']:
@@ -147,8 +169,10 @@ def tags_from_cached(meta):
   tags.append('owner_nsid:{}'.format(owner_from_cached(meta)['nsid']))
   tags.append('owner:{}'.format(owner_from_cached(meta)['realname']))
 
-  woeid = woeid_from_cached(meta)
-  if woeid is not None:
-    tags.append('woeid:{}'.format(woeid))
+  # geo tags
+  for geo in [woeid_from_cached, region_from_cached, county_from_cached, country_from_cached]:
+    val = geo(meta)
+    if val is not None:
+      tags.append('{}:{}'.format(geo.__name__.split('_')[0], val))
 
   return tags

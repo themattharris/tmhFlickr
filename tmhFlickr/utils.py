@@ -1,6 +1,8 @@
 from pprint import pprint as pp
+from fractions import Fraction
 import datetime
 import json
+import math
 import os
 
 def emit(obj):
@@ -43,3 +45,9 @@ def uniq_by_id(photo_list):
 def write_to_file(content, save_path):
   with open(save_path, 'w') as outfile:
     json.dump(content, outfile)
+
+def decimal_to_fraction(decimal):
+  remainder, degrees = math.modf(abs(decimal))
+  remainder, minutes = math.modf(remainder * 60)
+  remainder, seconds = math.modf(remainder * 60)
+  return [Fraction(n) for n in (degrees, minutes, seconds)]
