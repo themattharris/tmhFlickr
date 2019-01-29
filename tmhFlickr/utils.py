@@ -46,8 +46,7 @@ def write_to_file(content, save_path):
   with open(save_path, 'w') as outfile:
     json.dump(content, outfile)
 
-def decimal_to_fraction(decimal):
+def decimal_to_dms_fractions(decimal):
   remainder, degrees = math.modf(abs(decimal))
   remainder, minutes = math.modf(remainder * 60)
-  remainder, seconds = math.modf(remainder * 60)
-  return [Fraction(n) for n in (degrees, minutes, seconds)]
+  return [Fraction(degrees), Fraction(minutes), Fraction(int(remainder*60*100), 100)]

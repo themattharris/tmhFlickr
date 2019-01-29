@@ -1,7 +1,7 @@
 import json
 import os
 import pyexiv2
-from .utils import say, strip_extension, emit, epoch_to_date_str, decimal_to_fraction
+from .utils import say, strip_extension, emit, epoch_to_date_str, decimal_to_dms_fractions
 
 def inspect_embedded(filename):
   metadata = pyexiv2.ImageMetadata(filename)
@@ -51,9 +51,9 @@ def new_metadata(meta_cached):
   # geo exif
   lat, lng = latlng_from_cached(meta_cached)
   if lat is not None and lng is not None:
-    new_metadata['Exif.GPSInfo.GPSLatitude'] = decimal_to_fraction(lat)
+    new_metadata['Exif.GPSInfo.GPSLatitude'] = decimal_to_dms_fractions(lat)
     new_metadata['Exif.GPSInfo.GPSLatitudeRef'] = 'N' if lat >= 0 else 'S'
-    new_metadata['Exif.GPSInfo.GPSLongitude'] = decimal_to_fraction(lng)
+    new_metadata['Exif.GPSInfo.GPSLongitude'] = decimal_to_dms_fractions(lng)
     new_metadata['Exif.GPSInfo.GPSLongitudeRef'] = 'E' if lng >= 0 else 'W'
 
   # add flickr perm
